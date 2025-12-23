@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - run: go vet ./...
+      - run: gofmt -l . && test -z "$(gofmt -l .)"
+
+  unit-tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - run: go test -v ./...
+
+  integration-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      - run: go test -v -tags=integration ./sandbox/
+
+  integration-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - run: go test -v -tags=integration ./sandbox/
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - run: GOOS=linux GOARCH=amd64 go build -o /dev/null ./cmd/agentsandbox
+      - run: GOOS=linux GOARCH=arm64 go build -o /dev/null ./cmd/agentsandbox
+      - run: GOOS=darwin GOARCH=amd64 go build -o /dev/null ./cmd/agentsandbox
+      - run: GOOS=darwin GOARCH=arm64 go build -o /dev/null ./cmd/agentsandbox
