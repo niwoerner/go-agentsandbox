@@ -2,6 +2,10 @@
 
 Lightweight filesystem sandbox for AI agents running on local machines.
 
+Inspired by [sandbox-runtime](https://github.com/anthropic-experimental/sandbox-runtime). Created as a pure Go package for easy integration, with filesystem-only restrictions (network unrestricted by design).
+
+**Primary use case:** Prevent agents from destructive filesystem operations on the host machine.
+
 Prevents agents from accidentally:
 - Deleting files outside the workspace (`rm -rf /`)
 - Modifying sensitive directories (`~/.ssh`, `~/.aws`)
