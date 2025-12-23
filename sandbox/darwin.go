@@ -55,21 +55,41 @@ func (s *darwinSandbox) generateProfile() string {
 	sb.WriteString("(allow default)\n")
 	sb.WriteString("(allow network*)\n")
 
-	// Deny all file writes by default
-	sb.WriteString("(deny file-write*)\n")
+	// Handle write permissions
+	if HasWildcard(s.cfg.AllowWrite) {
+		// Wildcard: allow all writes (don't add deny rule)
+	} else {
+		// Deny all file writes by default
+		sb.WriteString("(deny file-write*)\n")
 
-	// Allow writes to specific paths
-	for _, path := range s.cfg.AllowWrite {
-		// Skip if path is in DenyRead (DenyRead takes precedence)
-		if pathInDenyRead(path, s.cfg.DenyRead) {
-			continue
+		// Allow writes to specific paths
+		for _, path := range s.cfg.AllowWrite {
+			// Skip if path is in DenyRead (DenyRead takes precedence)
+			if pathInDenyRead(path, s.cfg.DenyRead) {
+				continue
+			}
+			sb.WriteString(fmt.Sprintf("(allow file-write* (subpath %q))\n", path))
 		}
-		sb.WriteString(fmt.Sprintf("(allow file-write* (subpath %q))\n", path))
 	}
 
-	// Deny reads from sensitive paths
-	for _, path := range s.cfg.DenyRead {
-		sb.WriteString(fmt.Sprintf("(deny file-read* (subpath %q))\n", path))
+	// Handle read restrictions
+	if HasWildcard(s.cfg.DenyRead) {
+		// Wildcard: deny all reads (except essential system paths for execution)
+		sb.WriteString("(deny file-read*)\n")
+		// Must allow reads from essential paths for command execution
+		sb.WriteString("(allow file-read* (subpath \"/usr\"))\n")
+		sb.WriteString("(allow file-read* (subpath \"/bin\"))\n")
+		sb.WriteString("(allow file-read* (subpath \"/sbin\"))\n")
+		sb.WriteString("(allow file-read* (subpath \"/var\"))\n")
+		sb.WriteString("(allow file-read* (subpath \"/private\"))\n")
+		sb.WriteString("(allow file-read* (subpath \"/dev\"))\n")
+		sb.WriteString("(allow file-read* (subpath \"/System\"))\n")
+		sb.WriteString("(allow file-read* (subpath \"/Library\"))\n")
+	} else {
+		// Deny reads from specific sensitive paths
+		for _, path := range s.cfg.DenyRead {
+			sb.WriteString(fmt.Sprintf("(deny file-read* (subpath %q))\n", path))
+		}
 	}
 
 	return sb.String()

@@ -45,6 +45,8 @@ func execCmd(args []string) {
 	fs := flag.NewFlagSet("exec", flag.ExitOnError)
 
 	var (
+		configPath string
+		noConfig   bool
 		workdir    string
 		allowWrite stringSlice
 		denyRead   stringSlice
@@ -52,9 +54,11 @@ func execCmd(args []string) {
 		dryRun     bool
 	)
 
+	fs.StringVar(&configPath, "config", "", "Config file path (default: ~/.agent/sandbox/config.json)")
+	fs.BoolVar(&noConfig, "no-config", false, "Skip loading config file")
 	fs.StringVar(&workdir, "workdir", "", "Working directory (default: cwd)")
-	fs.Var(&allowWrite, "allow-write", "Additional writable path (repeatable)")
-	fs.Var(&denyRead, "deny-read", "Additional protected path (repeatable)")
+	fs.Var(&allowWrite, "allow-write", "Writable path, replaces config (repeatable)")
+	fs.Var(&denyRead, "deny-read", "Protected path, replaces config (repeatable)")
 	fs.BoolVar(&cleanEnv, "clean-env", false, "Start with minimal environment")
 	fs.BoolVar(&dryRun, "dry-run", false, "Print command instead of executing")
 
@@ -83,22 +87,35 @@ func execCmd(args []string) {
 		os.Exit(exitSandboxError)
 	}
 
-	// Build config
-	cfg := sandbox.DefaultConfig()
+	// Build config based on flags
+	var cfg sandbox.Config
+	if noConfig {
+		// Skip config file, use hardcoded defaults only
+		cfg = sandbox.DefaultConfigWithPath("")
+	} else if configPath != "" {
+		// Use specified config file
+		cfg = sandbox.DefaultConfigWithPath(configPath)
+	} else {
+		// Use default config file path
+		cfg = sandbox.DefaultConfig()
+	}
 
 	if workdir != "" {
 		cfg.Workdir = workdir
 	}
 
+	// CLI flags replace config values (not append)
 	if len(allowWrite) > 0 {
-		cfg.AllowWrite = append(cfg.AllowWrite, allowWrite...)
+		cfg.AllowWrite = allowWrite
 	}
 
 	if len(denyRead) > 0 {
-		cfg.DenyRead = append(cfg.DenyRead, denyRead...)
+		cfg.DenyRead = denyRead
 	}
 
-	cfg.CleanEnv = cleanEnv
+	if cleanEnv {
+		cfg.CleanEnv = true
+	}
 	cfg.DryRun = dryRun
 
 	// Create sandbox
@@ -135,16 +152,29 @@ Commands:
   help    Show this help
 
 Flags for exec:
+  --config PATH        Config file path (default: ~/.agent/sandbox/config.json)
+  --no-config          Skip loading config file
   --workdir DIR        Working directory (default: cwd)
-  --allow-write PATH   Additional writable path (repeatable)
-  --deny-read PATH     Additional protected path (repeatable)
+  --allow-write PATH   Writable path, replaces config (repeatable)
+  --deny-read PATH     Protected path, replaces config (repeatable)
   --clean-env          Start with minimal environment
   --dry-run            Print command instead of executing
+
+Config file format (JSON):
+  {
+    "allowWrite": ["/tmp", "."],
+    "denyRead": ["~/.ssh", "~/.aws"],
+    "cleanEnv": false,
+    "envDenylist": ["AWS_SECRET_ACCESS_KEY"]
+  }
+
+Use "*" as wildcard: "allowWrite": ["*"] allows all writes.
 
 Examples:
   agentsandbox exec -- npm install
   agentsandbox exec --workdir /project -- make build
-  agentsandbox exec --allow-write /var/cache -- apt-get update
+  agentsandbox exec --config ./my-config.json -- make build
+  agentsandbox exec --no-config -- ls -la
   agentsandbox exec --dry-run -- rm -rf /
 
 Exit codes:

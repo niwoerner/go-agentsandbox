@@ -33,8 +33,8 @@ type Sandbox interface {
 	RunWithStdin(ctx context.Context, command string, stdin io.Reader) (output []byte, exitCode int, err error)
 }
 
-// DefaultConfig returns sensible defaults for AI agent use.
-func DefaultConfig() Config {
+// hardcodedDefaults returns the built-in default configuration.
+func hardcodedDefaults() Config {
 	cwd, _ := os.Getwd()
 	return Config{
 		Workdir:    cwd,
@@ -42,6 +42,32 @@ func DefaultConfig() Config {
 		DenyRead:   []string{"~/.ssh", "~/.aws", "~/.gnupg", "~/.kube", "~/.docker", "~/.config/gh"},
 		CleanEnv:   false,
 	}
+}
+
+// DefaultConfig returns config merged from hardcoded defaults and config file.
+// Config file at ~/.agent/sandbox/config.json is loaded if it exists.
+// Use DefaultConfigWithPath to specify a custom config file path.
+func DefaultConfig() Config {
+	return DefaultConfigWithPath(DefaultConfigPath())
+}
+
+// DefaultConfigWithPath returns config merged from hardcoded defaults and specified config file.
+// If configPath is empty or file doesn't exist, returns hardcoded defaults only.
+func DefaultConfigWithPath(configPath string) Config {
+	base := hardcodedDefaults()
+
+	if configPath == "" {
+		return base
+	}
+
+	fileCfg, err := LoadConfigFile(configPath)
+	if err != nil {
+		// Log error but continue with defaults
+		log.Printf("warning: failed to load config file %q: %v", configPath, err)
+		return base
+	}
+
+	return MergeConfig(base, fileCfg)
 }
 
 // New creates a platform-specific sandbox.

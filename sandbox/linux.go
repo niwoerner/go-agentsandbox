@@ -93,21 +93,37 @@ func (s *linuxSandbox) buildArgs(cmd string) []string {
 		"--die-with-parent",
 	}
 
-	// Read-only bind mount of root filesystem
-	args = append(args, "--ro-bind", "/", "/")
+	// Handle root filesystem mount based on wildcard
+	if HasWildcard(s.cfg.AllowWrite) {
+		// Wildcard: allow all writes - mount root as read-write
+		args = append(args, "--bind", "/", "/")
+	} else {
+		// Read-only bind mount of root filesystem
+		args = append(args, "--ro-bind", "/", "/")
 
-	// Writable bind mounts (skip paths in DenyRead)
-	for _, path := range s.cfg.AllowWrite {
-		if pathInDenyRead(path, s.cfg.DenyRead) {
-			continue
+		// Writable bind mounts (skip paths in DenyRead)
+		for _, path := range s.cfg.AllowWrite {
+			if pathInDenyRead(path, s.cfg.DenyRead) {
+				continue
+			}
+			args = append(args, "--bind", path, path)
 		}
-		args = append(args, "--bind", path, path)
 	}
 
-	// Hide sensitive directories with tmpfs overlay
-	// This must come after ro-bind to overlay the read-only mount
-	for _, path := range s.cfg.DenyRead {
-		args = append(args, "--tmpfs", path)
+	// Handle read restrictions
+	if HasWildcard(s.cfg.DenyRead) {
+		// Wildcard denyRead on Linux: hide home directory
+		// Can't hide everything, but hide user data
+		home, _ := expandPathNoResolve("~")
+		if home != "" {
+			args = append(args, "--tmpfs", home)
+		}
+	} else {
+		// Hide specific sensitive directories with tmpfs overlay
+		// This must come after ro-bind to overlay the read-only mount
+		for _, path := range s.cfg.DenyRead {
+			args = append(args, "--tmpfs", path)
+		}
 	}
 
 	// Mount /dev and /proc for basic functionality

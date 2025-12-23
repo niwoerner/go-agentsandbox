@@ -50,13 +50,42 @@ See [EXAMPLES.md](EXAMPLES.md) for detailed usage.
 
 Both backends enforce filesystem restrictions at the kernel level. Even if a script tries to bypass restrictions, the actual syscalls are blocked.
 
-### Default Configuration
+### Configuration
 
-**Writable paths (`AllowWrite`):**
+Configuration is loaded from `~/.agent/sandbox/config.json` if it exists.
+
+```json
+{
+  "allowWrite": ["/tmp", "."],
+  "denyRead": ["~/.ssh", "~/.aws", "~/.gnupg"],
+  "cleanEnv": false,
+  "envAllowlist": [],
+  "envDenylist": ["AWS_SECRET_ACCESS_KEY"]
+}
+```
+
+**Priority (lowest to highest):**
+1. Hardcoded defaults
+2. Config file (`~/.agent/sandbox/config.json`)
+3. CLI flags / SDK struct values
+
+**Wildcards:** Use `"*"` for everything, e.g., `"allowWrite": ["*"]` allows all writes.
+
+**Empty/omitted fields:** Use hardcoded defaults.
+
+CLI flags:
+```bash
+agentsandbox exec --config ./custom.json -- npm install
+agentsandbox exec --no-config -- npm install  # skip config file
+```
+
+### Default Values
+
+**Writable paths (`allowWrite`):**
 - Current working directory
 - `/tmp`
 
-**Protected paths (`DenyRead`):**
+**Protected paths (`denyRead`):**
 - `~/.ssh`
 - `~/.aws`
 - `~/.gnupg`
@@ -65,9 +94,13 @@ Both backends enforce filesystem restrictions at the kernel level. Even if a scr
 - `~/.config/gh`
 
 **Other defaults:**
-- `CleanEnv`: false (pass through full environment)
-- `EnvDenylist`: empty (configure as needed)
+- `cleanEnv`: false (pass through full environment)
+- `envDenylist`: empty (configure as needed)
 - Network: Unrestricted (by design)
+
+### Alternative
+
+For more advanced sandboxing (network restrictions, etc.), see [sandbox-runtime](https://github.com/anthropic-experimental/sandbox-runtime).
 
 ## Requirements
 
@@ -88,7 +121,3 @@ make test-integration
 # Linux integration tests (via Docker)
 make test-linux
 ```
-
-## License
-
-MIT
