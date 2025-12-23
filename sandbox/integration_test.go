@@ -98,7 +98,7 @@ func TestNetworkAllowed(t *testing.T) {
 	// Try multiple network commands - at least one should work
 	// This handles cases where curl isn't installed or network is flaky
 	commands := []string{
-		"ping -c 1 -W 2 127.0.0.1",                    // Ping localhost (always works if network stack available)
+		"ping -c 1 -W 2 127.0.0.1", // Ping localhost (always works if network stack available)
 		"curl -s --max-time 5 -o /dev/null https://example.com",
 		"wget -q --timeout=5 -O /dev/null https://example.com",
 	}
